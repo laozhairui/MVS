@@ -1,6 +1,7 @@
 #include "Camera.h"
 #include <iostream>
-#include <opencv2/highgui.hpp>
+#include <opencv2/opencv.hpp>
+#include <string>
 int main()
 {
     std::cout<<"start"<<std::endl;
@@ -25,6 +26,7 @@ int main()
         std::cout<<camera.lastError();
         return -1;
     }
+    int saveCount=0;
     while(true)
     {
         cv::Mat image;
@@ -46,6 +48,16 @@ int main()
         }
         cv::imshow("Camera",image);
         int key=cv::waitKey(1);
+        if(key == 's')
+        {
+            std::string filename = "test_"+std::to_string(saveCount++)+".jpg";
+            cv::imwrite(filename,image);
+            std::cout<<"saved:"<<filename<<std::endl;
+        }
+        else
+        {
+            std::cout<<"save failed"<<std::endl;
+        }
         if(key==27)
         {
             break;
