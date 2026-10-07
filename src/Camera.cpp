@@ -73,5 +73,22 @@ Camera::open()
 	deviceOpened_=true;
 	return true;
 }
+Camera::startGrabbing()
+{
+	lastError_.clear();
+	if(!deviceOpened_)//u=if ()
+	{
+		lastError_="open failed";
+		return false;
+	}
+	int ret=MV_CC_StartGrabbing(handle_);
+	if(ret!=MV_OK)
+	{
+		lastError_="grabbing failed";
+		return false;
+	}
+	grabbing_=true;
+	return true;
+}
 
 
