@@ -56,32 +56,32 @@ bool Camera::creatHandle(int deviceId)
 	}
 	return true;
 }
-Camera::open()
+bool Camera::open()
 {
-	lastError_.clear()
-	if(handle_=nullptr)
+	lastError_.clear();
+	if(handle_==nullptr)
 	{
-		lastError_="creat handle failed";
+		lastError_="don't create handle";
 		return false;
 	}
-	int ret=MV_CC_OpenDevice(handle_);
+	int ret =MV_CC_OpenDevice(handle_);
 	if(ret!=MV_OK)
 	{
-		lastError_="handle is null";
+		lastError_="open failed";
 		return false;
 	}
 	deviceOpened_=true;
 	return true;
 }
-Camera::startGrabbing()
+bool Camera::startGrabbing()
 {
 	lastError_.clear();
-	if(!deviceOpened_)//u=if ()
+	if (!deviceOpened_)
 	{
-		lastError_="open failed";
+		lastError_="camera is close";
 		return false;
 	}
-	int ret=MV_CC_StartGrabbing(handle_);
+	int ret =MV_CC_StartGrabbing(handle_);
 	if(ret!=MV_OK)
 	{
 		lastError_="grabbing failed";
@@ -90,5 +90,18 @@ Camera::startGrabbing()
 	grabbing_=true;
 	return true;
 }
+void Camera::stopGrabbing()
+{
+	lastError_.clear();
+	if(!grabbing_)	return;
+	int ret =MV_CC_StopGrabbing();
+	if(ret!=MV_OK)
+	{
+		lastError_="stop grabbing failed";
+		return;
+	}
+	grabbing_=false;
+}
+
 
 
