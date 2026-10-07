@@ -102,6 +102,20 @@ void Camera::stopGrabbing()
 	}
 	grabbing_=false;
 }
+void Camera::close()
+{
+	if(grabbing_)	stopGrabbing();
+	if(deviceOpened_)
+	{
+		MV_CC_CloseDevice(handle_);
+		deviceOpened=false;
+	}
+	if(handle_!=nullptr)
+	{
+		MV_CC_DestoryHandle(handle_);
+		handle_=nullptr;
+	}
+}
 
 
 
