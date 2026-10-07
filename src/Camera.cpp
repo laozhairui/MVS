@@ -11,7 +11,6 @@ Camera::camera
 	  deviceOpened_(false)
 	  grabbing_(false)
 {
-
 }
 */
 Camera::~Camera()
@@ -116,6 +115,9 @@ void Camera::close()
 		handle_=nullptr;
 	}
 }
+bool Camera::isOpened()const	return deviceOpened_;
+bool Camera::lastError()const	return lastError_;
+
 
 
 
