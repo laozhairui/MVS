@@ -23,5 +23,6 @@ private:
 	bool deviceOpened_;
 	bool grabbing_;
 	std::string lastError_;
+	bool convertToBGR(MV_FREAM_OUT& frameInfo,cv::Mat& image);
 };
 #endif

@@ -1,3 +1,4 @@
+#include <opencv2/imgproc.hpp>
 #include "Camera.h"
 Camera::Camera
 {
@@ -104,8 +105,33 @@ bool Camera::getFrame(cv::Mat& image)
 		lastError_="GetImageBuffer failed";
 		return false;
 	}
+	if(!Camera::convertToBGR(frameInfo,image))
+	{
+		MV_CC_FreeImageBuffer(handle_,&frameInfo);
+		return false;
+	}
 	MV_CC_FreeImageBuffer(handle_,&frameInfo);
 	return true;
+}
+bool Camera::convertToBGR(MV_FRAME_OUT& frameInfo,cv::Mat& image)
+{
+	int width = frameInfo.stFrameInfo.nWidth;
+	int height = FrameInfo.stFrameInfo.nHeight;
+	if(frameInfo.stFrameInfo.enPixelType == PixelType_Gvsp_BayerRG8)
+	{
+		cv::Mat bayer(height,width,CV_8UC1,frameInfo.pBufAddr)
+		cv::cvtColor(bayer,image,cv::COLOR_BayerRG2BGR);
+		return true;
+	}
+	if(frameInfo.stFrameInfo.enPixelType==PixelType_Gvsp_Mono8)
+	{
+		cv::Mat mono(height,width,CV_8UC1,frameInfo.pBufAddr);
+		cv:cvtColor(mono,image,cv::COLOR_GRAY2BGR);
+		return true;
+	}
+	lastError_="else pixel";
+	return false;
+	
 }
 void Camera::stopGrabbing()
 {
