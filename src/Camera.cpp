@@ -56,5 +56,22 @@ bool Camera::creatHandle(int deviceId)
 	}
 	return true;
 }
+Camera::open()
+{
+	lastError_.clear()
+	if(handle_=nullptr)
+	{
+		lastError_="creat handle failed";
+		return false;
+	}
+	int ret=MV_CC_OpenDevice(handle_);
+	if(ret!=MV_OK)
+	{
+		lastError_="handle is null";
+		return false;
+	}
+	deviceOpened_=true;
+	return true;
+}
 
 
