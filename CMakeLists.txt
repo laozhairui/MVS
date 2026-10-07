@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.22)
+project(MVS LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+add_executable(MVS src/main.cpp src/Camera.cpp)
+target_include_directories(MVS PRIVATE include)
