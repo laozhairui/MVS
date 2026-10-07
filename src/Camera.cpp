@@ -89,6 +89,24 @@ bool Camera::startGrabbing()
 	grabbing_=true;
 	return true;
 }
+bool Camera::getFrame(cv::Mat& image)
+{
+	lastError_.clear();
+	if(!grabbing_)
+	{
+		lastError_="don't grab";
+		return false;
+	}
+	MV_FRAME_OUT frameInfo={};
+	int ret =MV_CC_GetImageBuffer(handle_,&frameInfo,1000);
+	if(ret !=MV_OK)
+	{
+		lastError_="GetImageBuffer failed";
+		return false;
+	}
+	MV_CC_FreeImageBuffer(handle_,&frameInfo);
+	return true;
+}
 void Camera::stopGrabbing()
 {
 	lastError_.clear();

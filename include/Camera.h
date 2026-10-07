@@ -2,6 +2,7 @@
 #define CAMERA_H
 #include <MVCameraControl.h>
 #include <string>
+#include <opencv2/core.hpp>
 class Camera
 {
 public:
@@ -11,7 +12,7 @@ public:
 	bool createHandle(int deviceId=0);
 	bool open();
 	bool startGrabbing();
-	bool getFrame();
+	bool getFrame(cv::Mat& image);
 	void stopGrabbing();
 	void close();
 	bool isOpened() const;//const ai
