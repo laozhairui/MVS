@@ -1,6 +1,6 @@
 #ifndef CAMERA_H
 #define CAMERA_H
-#include <MVCameraControl.h>
+#include <MvCameraControl.h>
 #include <string>
 #include <opencv2/core.hpp>
 class Camera
@@ -9,7 +9,7 @@ public:
 	Camera();
 	~Camera();
 	bool enumerateDevices();
-	bool createHandle(int deviceId=0);
+	bool creatHandle(int deviceId=0);
 	bool open();
 	bool startGrabbing();
 	bool getFrame(cv::Mat& image);
@@ -23,6 +23,6 @@ private:
 	bool deviceOpened_;
 	bool grabbing_;
 	std::string lastError_;
-	bool convertToBGR(MV_FREAM_OUT& frameInfo,cv::Mat& image);
+	bool convertToBGR(MV_FRAME_OUT& frameInfo,cv::Mat& image);
 };
 #endif

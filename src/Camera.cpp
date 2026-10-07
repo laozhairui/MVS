@@ -1,6 +1,7 @@
 #include <opencv2/imgproc.hpp>
+#include <iostream>
 #include "Camera.h"
-Camera::Camera
+Camera::Camera()
 {
 	handle_=nullptr;
 	deviceOpened_=false;
@@ -37,7 +38,7 @@ bool Camera::enumerateDevices()
 bool Camera::creatHandle(int deviceId)
 {
 	lastError_.clear();
-	if(deviceId<0 || deviced>=static_cast<int>(deviceList_.nDeviceNum))//static
+	if(deviceId<0 || deviceId>=static_cast<int>(deviceList_.nDeviceNum))//static
 	{
 		lastError_="wrong camera id";
 		return false;
@@ -65,6 +66,25 @@ bool Camera::open()
 		return false;
 	}
 	int ret =MV_CC_OpenDevice(handle_);
+	MV_CC_SetEnumValue(
+    	handle_,
+    	"ExposureAuto",
+    	0
+	);
+
+
+	MV_CC_SetFloatValue(
+    	handle_,
+    	"ExposureTime",
+    	30000
+	);
+
+
+	MV_CC_SetFloatValue(
+    	handle_,
+    	"Gain",
+    	15
+	);
 	if(ret!=MV_OK)
 	{
 		lastError_="open failed";
@@ -72,7 +92,7 @@ bool Camera::open()
 	}
 	deviceOpened_=true;
 	return true;
-}
+	}
 bool Camera::startGrabbing()
 {
 	lastError_.clear();
@@ -100,6 +120,19 @@ bool Camera::getFrame(cv::Mat& image)
 	}
 	MV_FRAME_OUT frameInfo={};
 	int ret =MV_CC_GetImageBuffer(handle_,&frameInfo,1000);
+	if(ret == MV_OK)
+	{
+    	std::cout 
+        << "width="
+        << frameInfo.stFrameInfo.nWidth
+        << " height="
+        << frameInfo.stFrameInfo.nHeight
+        << std::endl;
+		std::cout 
+		<< "pixel type="
+		<< frameInfo.stFrameInfo.enPixelType
+		<< std::endl;
+	}
 	if(ret !=MV_OK)
 	{
 		lastError_="GetImageBuffer failed";
@@ -113,31 +146,60 @@ bool Camera::getFrame(cv::Mat& image)
 	MV_CC_FreeImageBuffer(handle_,&frameInfo);
 	return true;
 }
-bool Camera::convertToBGR(MV_FRAME_OUT& frameInfo,cv::Mat& image)
+bool Camera::convertToBGR(MV_FRAME_OUT& frameInfo, cv::Mat& image)
 {
-	int width = frameInfo.stFrameInfo.nWidth;
-	int height = FrameInfo.stFrameInfo.nHeight;
-	if(frameInfo.stFrameInfo.enPixelType == PixelType_Gvsp_BayerRG8)
-	{
-		cv::Mat bayer(height,width,CV_8UC1,frameInfo.pBufAddr)
-		cv::cvtColor(bayer,image,cv::COLOR_BayerRG2BGR);
-		return true;
-	}
-	if(frameInfo.stFrameInfo.enPixelType==PixelType_Gvsp_Mono8)
-	{
-		cv::Mat mono(height,width,CV_8UC1,frameInfo.pBufAddr);
-		cv:cvtColor(mono,image,cv::COLOR_GRAY2BGR);
-		return true;
-	}
-	lastError_="else pixel";
-	return false;
-	
-}
+    if(frameInfo.pBufAddr == nullptr)
+    {
+        return false;
+    }
+
+
+    cv::Mat raw(
+        frameInfo.stFrameInfo.nHeight,
+        frameInfo.stFrameInfo.nWidth,
+        CV_8UC1,
+        frameInfo.pBufAddr
+    );
+	double minValue;
+	double maxValue;
+
+	cv::minMaxLoc(
+    	raw,
+    	&minValue,
+    	&maxValue
+	);
+
+	std::cout
+	<< "raw min="
+	<< minValue
+	<< " max="
+	<< maxValue
+	<< std::endl;
+
+    cv::cvtColor(
+        raw,
+        image,
+        cv::COLOR_BayerBG2BGR
+    );
+	std::cout
+	<< "BGR channels="
+	<< image.channels()
+	<< " size="
+	<< image.cols
+	<< "x"
+	<< image.rows
+	<< std::endl;
+
+    return true;
+}//ai
 void Camera::stopGrabbing()
 {
 	lastError_.clear();
-	if(!grabbing_)	return;
-	int ret =MV_CC_StopGrabbing();
+	if(!grabbing_)
+	{
+		return;
+	}
+	int ret =MV_CC_StopGrabbing(handle_);
 	if(ret!=MV_OK)
 	{
 		lastError_="stop grabbing failed";
@@ -147,20 +209,29 @@ void Camera::stopGrabbing()
 }
 void Camera::close()
 {
-	if(grabbing_)	stopGrabbing();
+	if(grabbing_)
+	{
+		stopGrabbing();
+	}
 	if(deviceOpened_)
 	{
 		MV_CC_CloseDevice(handle_);
-		deviceOpened=false;
+		deviceOpened_=false;
 	}
 	if(handle_!=nullptr)
 	{
-		MV_CC_DestoryHandle(handle_);
+		MV_CC_DestroyHandle(handle_);
 		handle_=nullptr;
 	}
 }
-bool Camera::isOpened()const	return deviceOpened_;
-bool Camera::lastError()const	return lastError_;
+bool Camera::isOpened()const
+{
+	return deviceOpened_;
+}
+std::string Camera::lastError()const
+{
+	return lastError_;
+}
 
 
 

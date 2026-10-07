@@ -3,6 +3,7 @@
 #include <opencv2/highgui.hpp>
 int main()
 {
+    std::cout<<"start"<<std::endl;
     Camera camera;
     if(!camera.enumerateDevices())
     {
@@ -27,13 +28,24 @@ int main()
     while(true)
     {
         cv::Mat image;
-        if(!camera.getFrame())
+        if(!camera.getFrame(image))
         {
             std::cout<<camera.lastError();
             break;
         }
+        if(camera.getFrame(image))
+        {
+            std::cout
+            << "show channels="
+            << image.channels()
+            << " size="
+            << image.cols
+            << "x"
+            << image.rows
+            << std::endl;
+        }
         cv::imshow("Camera",image);
-        int key=cv::waitkey(1);
+        int key=cv::waitKey(1);
         if(key==27)
         {
             break;
@@ -43,5 +55,5 @@ int main()
     camera.stopGrabbing();
     camera.close();
     return 0;
-    
+    system("pause");
 }
