@@ -1,10 +1,31 @@
-cmake_minimum_required(VERSION 3.22)
+cmake_minimum_required(VERSION 3.10)
+
 project(MVS LANGUAGES CXX)
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(OpenCV_DIR "C:/opencv/build/x64/vc15/lib")
+
 find_package(OpenCV REQUIRED)
-add_executable(MVS src/main.cpp src/Camera.cpp)
-set_target_properties(MVS PROPERTIES LINK_FLAGS "/SUBSYSTEM:CONSOLE")
-target_include_directories(MVS PRIVATE include ${OpenCV_INCLUDE_DIRS} "C:/Program Files (x86)/MVS/Development/Includes")
-target_link_libraries(MVS ${OpenCV_LIBS} "C:/Program Files (x86)/MVS/Development/Libraries/win64/MvCameraControl.lib")
+
+set(MVS_INCLUDE_DIR "/opt/MVS/include")
+set(MVS_LIBRARY_DIR "/opt/MVS_Runtime/MVS/lib/64")
+
+add_executable(MVS
+    src/main.cpp
+    src/Camera.cpp
+)
+
+target_include_directories(MVS PRIVATE
+    include
+    ${OpenCV_INCLUDE_DIRS}
+    ${MVS_INCLUDE_DIR}
+)
+
+target_link_directories(MVS PRIVATE
+    ${MVS_LIBRARY_DIR}
+)
+
+target_link_libraries(MVS PRIVATE
+    ${OpenCV_LIBS}
+    MvCameraControl
+)

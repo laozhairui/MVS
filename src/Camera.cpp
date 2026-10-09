@@ -1,238 +1,422 @@
+
+#include <Camera.h>
+
 #include <opencv2/imgproc.hpp>
-#include <iostream>
-#include "Camera.h"
+
 Camera::Camera()
-{
-	handle_=nullptr;
-	deviceOpened_=false;
-	grabbing_=false;	
-}
-/*ai Member Initializer List
-Camera::camera
-	: handle_(nullptr)
-	  deviceOpened_(false)
-	  grabbing_(false)
+    : m_device_list{}
+    , m_handle(nullptr)
+    , m_sdk_initialized(false)
+    , m_device_opened(false)
+    , m_grabbing(false)
+    , m_last_error()
 {
 }
-*/
+
 Camera::~Camera()
 {
-	close();
+    finalize();
 }
-bool Camera::enumerateDevices()
+
+bool Camera::initialize()
 {
-	lastError_.clear(); 
-	int ret=MV_CC_EnumDevices(MV_GIGE_DEVICE | MV_USB_DEVICE,&deviceList_);
-	if(ret!=MV_OK)
-	{
-		lastError_="wrong on enumerateDevices";
-		return false;
-	}
-	if(deviceList_.nDeviceNum==0)//nDeviceNum
-	{
-		lastError_="can't find camera";
-		return false;
-	}
-	return true;
+    if (m_sdk_initialized)
+    {
+        return true;
+    }
+
+    m_last_error.clear();
+
+    int ret = MV_CC_Initialize();
+
+    if (ret != MV_OK)
+    {
+        m_last_error = "Failed to initialize MVS SDK.";
+        return false;
+    }
+
+    m_sdk_initialized = true;
+
+    return true;
 }
-bool Camera::creatHandle(int deviceId)
+
+bool Camera::finalize()
 {
-	lastError_.clear();
-	if(deviceId<0 || deviceId>=static_cast<int>(deviceList_.nDeviceNum))//static
-	{
-		lastError_="wrong camera id";
-		return false;
-	}
-	MV_CC_DEVICE_INFO* deviceInfo=deviceList_.pDeviceInfo[deviceId];
-	if(deviceInfo==nullptr)
-	{
-		lastError_="infomation is null";
-		return false;
-	} 
-	int ret=MV_CC_CreateHandle(&handle_,deviceInfo);
-	if(ret!=MV_OK)
-	{
-		lastError_="can't creat handle";
-		return false;
-	}
-	return true;
+    close();
+
+    if (!m_sdk_initialized)
+    {
+        return true;
+    }
+
+    int ret = MV_CC_Finalize();
+
+    if (ret != MV_OK)
+    {
+        m_last_error = "Failed to finalize MVS SDK.";
+        return false;
+    }
+
+    m_sdk_initialized = false;
+
+    return true;
 }
+
+bool Camera::enumerate_devices()
+{
+    m_last_error.clear();
+    m_device_list = {};
+
+    if (!m_sdk_initialized)
+    {
+        m_last_error = "Initialize the MVS SDK first.";
+        return false;
+    }
+
+    int ret = MV_CC_EnumDevices(
+        MV_GIGE_DEVICE | MV_USB_DEVICE,
+        &m_device_list
+    );
+
+    if (ret != MV_OK)
+    {
+        m_last_error = "Failed to enumerate camera devices.";
+        return false;
+    }
+
+    if (m_device_list.nDeviceNum == 0)
+    {
+        m_last_error = "No camera device found.";
+        return false;
+    }
+
+    return true;
+}
+
+bool Camera::create_handle(int device_id)
+{
+    m_last_error.clear();
+
+    if (!m_sdk_initialized)
+    {
+        m_last_error = "Initialize the MVS SDK first.";
+        return false;
+    }
+
+    if (m_handle != nullptr)
+    {
+        m_last_error = "Camera handle already exists.";
+        return false;
+    }
+
+    if (device_id < 0
+        || device_id >= static_cast<int>(m_device_list.nDeviceNum))
+    {
+        m_last_error = "Invalid camera device ID.";
+        return false;
+    }
+
+    MV_CC_DEVICE_INFO* device_info =
+        m_device_list.pDeviceInfo[device_id];
+
+    if (device_info == nullptr)
+    {
+        m_last_error = "Camera device information is null.";
+        return false;
+    }
+
+    int ret = MV_CC_CreateHandle(
+        &m_handle,
+        device_info
+    );
+
+    if (ret != MV_OK)
+    {
+        m_handle = nullptr;
+        m_last_error = "Failed to create camera handle.";
+        return false;
+    }
+
+    return true;
+}
+
 bool Camera::open()
 {
-	lastError_.clear();
-	if(handle_==nullptr)
-	{
-		lastError_="don't create handle";
-		return false;
-	}
-	int ret =MV_CC_OpenDevice(handle_);
-	MV_CC_SetEnumValue(
-    	handle_,
-    	"ExposureAuto",
-    	0
-	);
+    m_last_error.clear();
 
+    if (!m_sdk_initialized)
+    {
+        m_last_error = "Initialize the MVS SDK first.";
+        return false;
+    }
 
-	MV_CC_SetFloatValue(
-    	handle_,
-    	"ExposureTime",
-    	30000
-	);
+    if (m_handle == nullptr)
+    {
+        m_last_error = "Create the camera handle before opening.";
+        return false;
+    }
 
+    if (m_device_opened)
+    {
+        return true;
+    }
 
-	MV_CC_SetFloatValue(
-    	handle_,
-    	"Gain",
-    	15
-	);
-	if(ret!=MV_OK)
-	{
-		lastError_="open failed";
-		return false;
-	}
-	deviceOpened_=true;
-	return true;
-	}
-bool Camera::startGrabbing()
-{
-	lastError_.clear();
-	if (!deviceOpened_)
-	{
-		lastError_="camera is close";
-		return false;
-	}
-	int ret =MV_CC_StartGrabbing(handle_);
-	if(ret!=MV_OK)
-	{
-		lastError_="grabbing failed";
-		return false;
-	}
-	grabbing_=true;
-	return true;
+    int ret = MV_CC_OpenDevice(m_handle);
+
+    if (ret != MV_OK)
+    {
+        m_last_error = "Failed to open camera device.";
+        return false;
+    }
+
+    m_device_opened = true;
+
+    if (!set_camera_parameters())
+    {
+        std::string error_message = m_last_error;
+
+        close();
+
+        m_last_error = error_message;
+
+        return false;
+    }
+
+    return true;
 }
-bool Camera::getFrame(cv::Mat& image)
+
+bool Camera::set_camera_parameters()
 {
-	lastError_.clear();
-	if(!grabbing_)
-	{
-		lastError_="don't grab";
-		return false;
-	}
-	MV_FRAME_OUT frameInfo={};
-	int ret =MV_CC_GetImageBuffer(handle_,&frameInfo,1000);
-	if(ret == MV_OK)
-	{
-    	std::cout 
-        << "width="
-        << frameInfo.stFrameInfo.nWidth
-        << " height="
-        << frameInfo.stFrameInfo.nHeight
-        << std::endl;
-		std::cout 
-		<< "pixel type="
-		<< frameInfo.stFrameInfo.enPixelType
-		<< std::endl;
-	}
-	if(ret !=MV_OK)
-	{
-		lastError_="GetImageBuffer failed";
-		return false;
-	}
-	if(!Camera::convertToBGR(frameInfo,image))
-	{
-		MV_CC_FreeImageBuffer(handle_,&frameInfo);
-		return false;
-	}
-	MV_CC_FreeImageBuffer(handle_,&frameInfo);
-	return true;
+    m_last_error.clear();
+
+    if (!m_device_opened)
+    {
+        m_last_error = "Open camera before setting parameters.";
+        return false;
+    }
+
+    int ret = MV_CC_SetEnumValue(
+        m_handle,
+        "ExposureAuto",
+        0
+    );
+
+    if (ret != MV_OK)
+    {
+        m_last_error = "Failed to disable auto exposure.";
+        return false;
+    }
+
+    ret = MV_CC_SetFloatValue(
+        m_handle,
+        "ExposureTime",
+        30000.0F
+    );
+
+    if (ret != MV_OK)
+    {
+        m_last_error = "Failed to set exposure time.";
+        return false;
+    }
+
+    ret = MV_CC_SetFloatValue(
+        m_handle,
+        "Gain",
+        15.0F
+    );
+
+    if (ret != MV_OK)
+    {
+        m_last_error = "Failed to set gain.";
+        return false;
+    }
+
+    return true;
 }
-bool Camera::convertToBGR(MV_FRAME_OUT& frameInfo, cv::Mat& image)
+
+bool Camera::start_grabbing()
 {
-    if(frameInfo.pBufAddr == nullptr)
+    m_last_error.clear();
+
+    if (!m_device_opened)
+    {
+        m_last_error =
+            "Open the camera before starting acquisition.";
+        return false;
+    }
+
+    if (m_grabbing)
+    {
+        return true;
+    }
+
+    int ret = MV_CC_StartGrabbing(m_handle);
+
+    if (ret != MV_OK)
+    {
+        m_last_error = "Failed to start image acquisition.";
+        return false;
+    }
+
+    m_grabbing = true;
+
+    return true;
+}
+
+bool Camera::get_frame(cv::Mat& image)
+{
+    m_last_error.clear();
+
+    if (!m_grabbing)
+    {
+        m_last_error =
+            "Start image acquisition before getting frames.";
+        return false;
+    }
+
+    MV_FRAME_OUT frame_info{};
+
+    int ret = MV_CC_GetImageBuffer(
+        m_handle,
+        &frame_info,
+        1000
+    );
+
+    if (ret != MV_OK)
+    {
+        m_last_error = "Failed to get image buffer.";
+        return false;
+    }
+
+    bool convert_success = convert_to_bgr(
+        frame_info,
+        image
+    );
+
+    int free_ret = MV_CC_FreeImageBuffer(
+        m_handle,
+        &frame_info
+    );
+
+    if (!convert_success)
+    {
+        image.release();
+        m_last_error = "Failed to convert image to BGR format.";
+        return false;
+    }
+
+    if (free_ret != MV_OK)
+    {
+        image.release();
+        m_last_error = "Failed to release image buffer.";
+        return false;
+    }
+
+    return true;
+}
+
+bool Camera::convert_to_bgr(
+    MV_FRAME_OUT& frame_info,
+    cv::Mat& image
+)
+{
+    if (frame_info.pBufAddr == nullptr)
     {
         return false;
     }
 
-
-    cv::Mat raw(
-        frameInfo.stFrameInfo.nHeight,
-        frameInfo.stFrameInfo.nWidth,
-        CV_8UC1,
-        frameInfo.pBufAddr
+    int width = static_cast<int>(
+        frame_info.stFrameInfo.nWidth
     );
-	double minValue;
-	double maxValue;
 
-	cv::minMaxLoc(
-    	raw,
-    	&minValue,
-    	&maxValue
-	);
+    int height = static_cast<int>(
+        frame_info.stFrameInfo.nHeight
+    );
 
-	std::cout
-	<< "raw min="
-	<< minValue
-	<< " max="
-	<< maxValue
-	<< std::endl;
+    if (width <= 0 || height <= 0)
+    {
+        return false;
+    }
+
+    cv::Mat raw_image(
+        height,
+        width,
+        CV_8UC1,
+        frame_info.pBufAddr
+    );
 
     cv::cvtColor(
-        raw,
+        raw_image,
         image,
         cv::COLOR_BayerBG2BGR
     );
-	std::cout
-	<< "BGR channels="
-	<< image.channels()
-	<< " size="
-	<< image.cols
-	<< "x"
-	<< image.rows
-	<< std::endl;
 
-    return true;
-}//ai
-void Camera::stopGrabbing()
-{
-	lastError_.clear();
-	if(!grabbing_)
-	{
-		return;
-	}
-	int ret =MV_CC_StopGrabbing(handle_);
-	if(ret!=MV_OK)
-	{
-		lastError_="stop grabbing failed";
-		return;
-	}
-	grabbing_=false;
+    return !image.empty();
 }
+
+void Camera::stop_grabbing()
+{
+    if (!m_grabbing)
+    {
+        return;
+    }
+
+    int ret = MV_CC_StopGrabbing(m_handle);
+
+    if (ret != MV_OK)
+    {
+        m_last_error = "Failed to stop image acquisition.";
+        return;
+    }
+
+    m_grabbing = false;
+}
+
 void Camera::close()
 {
-	if(grabbing_)
-	{
-		stopGrabbing();
-	}
-	if(deviceOpened_)
-	{
-		MV_CC_CloseDevice(handle_);
-		deviceOpened_=false;
-	}
-	if(handle_!=nullptr)
-	{
-		MV_CC_DestroyHandle(handle_);
-		handle_=nullptr;
-	}
+    if (m_handle == nullptr)
+    {
+        m_device_opened = false;
+        m_grabbing = false;
+        return;
+    }
+
+    if (m_grabbing)
+    {
+        stop_grabbing();
+    }
+
+    if (m_device_opened)
+    {
+        int ret = MV_CC_CloseDevice(m_handle);
+
+        if (ret != MV_OK && m_last_error.empty())
+        {
+            m_last_error = "Failed to close camera device.";
+        }
+
+        m_device_opened = false;
+        m_grabbing = false;
+    }
+
+    int ret = MV_CC_DestroyHandle(m_handle);
+
+    if (ret != MV_OK && m_last_error.empty())
+    {
+        m_last_error = "Failed to destroy camera handle.";
+    }
+
+    m_handle = nullptr;
+    m_device_opened = false;
+    m_grabbing = false;
 }
-bool Camera::isOpened()const
+
+bool Camera::is_opened() const
 {
-	return deviceOpened_;
+    return m_device_opened;
 }
-std::string Camera::lastError()const
+
+std::string Camera::last_error() const
 {
-	return lastError_;
+    return m_last_error;
 }
-
-
-
-
