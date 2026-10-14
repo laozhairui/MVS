@@ -1,0 +1,3 @@
+/home/hi/MVS/build/CMakeFiles/MVS.dir
+/home/hi/MVS/build/CMakeFiles/edit_cache.dir
+/home/hi/MVS/build/CMakeFiles/rebuild_cache.dir
