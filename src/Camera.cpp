@@ -2,11 +2,12 @@
 #include <Camera.h>
 
 #include <opencv2/imgproc.hpp>
+int Camera::m_sdk_reference_count =0;
 
 Camera::Camera()
     : m_device_list{}
     , m_handle(nullptr)
-    , m_sdk_initialized(false)
+    , m_sdk_acquired(false)
     , m_device_opened(false)
     , m_grabbing(false)
     , m_last_error()
@@ -20,44 +21,60 @@ Camera::~Camera()
 
 bool Camera::initialize()
 {
-    if (m_sdk_initialized)
+    if(m_sdk_acquired)
     {
         return true;
     }
-
     m_last_error.clear();
 
-    int ret = MV_CC_Initialize();
-
-    if (ret != MV_OK)
+    if(m_sdk_reference_count == 0)
     {
-        m_last_error = "Failed to initialize MVS SDK.";
-        return false;
+        int ret =MV_CC_Initialize();
+
+        if(ret != MV_OK)
+        {
+            m_last_error = "Failed to initialize MVS SDK.";
+            return false;
+        }
     }
 
-    m_sdk_initialized = true;
-
+    ++m_sdk_reference_count;
+    m_sdk_acquired = true;
     return true;
 }
 
 bool Camera::finalize()
 {
-    close();
-
-    if (!m_sdk_initialized)
+    if (!m_sdk_acquired)
     {
         return true;
     }
 
-    int ret = MV_CC_Finalize();
-
-    if (ret != MV_OK)
+    if(!close())
     {
-        m_last_error = "Failed to finalize MVS SDK.";
         return false;
     }
 
-    m_sdk_initialized = false;
+    if (m_sdk_reference_count <= 0)
+    {
+        m_last_error = "Invaild SDK reference count.";
+        return true;
+    }
+
+
+    if(m_sdk_reference_count == 1)
+    {
+        int ret = MV_CC_Finalize();
+
+        if (ret != MV_OK)
+        {
+            m_last_error = "Failed to finalize MVS SDK.";
+            return false;
+        }
+    }
+
+    --m_sdk_reference_count;
+    m_sdk_acquired = false;
 
     return true;
 }
@@ -67,7 +84,7 @@ bool Camera::enumerate_devices()
     m_last_error.clear();
     m_device_list = {};
 
-    if (!m_sdk_initialized)
+    if (!m_sdk_acquired)
     {
         m_last_error = "Initialize the MVS SDK first.";
         return false;
@@ -93,11 +110,18 @@ bool Camera::enumerate_devices()
     return true;
 }
 
+int Camera::device_count() const
+{
+    return static_cast<int>(
+        m_device_list.nDeviceNum
+    );
+}
+
 bool Camera::create_handle(int device_id)
 {
     m_last_error.clear();
 
-    if (!m_sdk_initialized)
+    if (!m_sdk_acquired)
     {
         m_last_error = "Initialize the MVS SDK first.";
         return false;
@@ -144,7 +168,7 @@ bool Camera::open()
 {
     m_last_error.clear();
 
-    if (!m_sdk_initialized)
+    if (!m_sdk_acquired)
     {
         m_last_error = "Initialize the MVS SDK first.";
         return false;
@@ -166,6 +190,9 @@ bool Camera::open()
     if (ret != MV_OK)
     {
         m_last_error = "Failed to open camera device.";
+        std::string error_message = m_last_error;
+        close();
+        m_last_error = error_message;
         return false;
     }
 
@@ -353,12 +380,11 @@ bool Camera::convert_to_bgr(
 
     return !image.empty();
 }
-
-void Camera::stop_grabbing()
+bool Camera::stop_grabbing()
 {
     if (!m_grabbing)
     {
-        return;
+        return true;
     }
 
     int ret = MV_CC_StopGrabbing(m_handle);
@@ -366,24 +392,29 @@ void Camera::stop_grabbing()
     if (ret != MV_OK)
     {
         m_last_error = "Failed to stop image acquisition.";
-        return;
+        return false;
     }
 
     m_grabbing = false;
+
+    return true;
 }
 
-void Camera::close()
+bool Camera::close()
 {
     if (m_handle == nullptr)
     {
         m_device_opened = false;
         m_grabbing = false;
-        return;
+        return true;
     }
 
     if (m_grabbing)
     {
-        stop_grabbing();
+        if (!stop_grabbing())
+        {
+            return false;
+        }
     }
 
     if (m_device_opened)
@@ -409,6 +440,8 @@ void Camera::close()
     m_handle = nullptr;
     m_device_opened = false;
     m_grabbing = false;
+
+    return true;
 }
 
 bool Camera::is_opened() const
